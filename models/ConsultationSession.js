@@ -37,6 +37,29 @@ const consultationSessionSchema = new mongoose.Schema(
             type: [answerSchema],
             default: []
         },
+        // --- ADDED AYURVEDIC & EMERGENCY RED FLAG DATA ---
+        redFlags: {
+            hasEmergency: { type: Boolean, default: false },
+            flaggedSymptoms: [String]
+        },
+        prakritiData: {
+            bodyBuild: String,
+            skin: String,
+            appetite: String,
+            sleep: String,
+            tempPreference: String,
+            activityLevel: String,
+            stressResponse: String
+        },
+        aharaData: {
+            mealsPerDay: String,
+            dietType: String,
+            frequentSpicyFried: Boolean,
+            waterIntake: String,
+            skipMeals: Boolean,
+            lateNightEating: Boolean
+        },
+        // ------------------------------------------------
         status: {
             type: String,
             enum: ['active', 'completed'],
@@ -49,8 +72,7 @@ const consultationSessionSchema = new mongoose.Schema(
         completedAt: Date,
         expiresAt: {
             type: Date,
-            default: null,
-            expires: 0
+            default: null
         }
     },
     {

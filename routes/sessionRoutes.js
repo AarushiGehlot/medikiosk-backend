@@ -24,7 +24,10 @@ async function createDoctorSummary(session) {
     const response = await axios.post(process.env.AI_PIPELINE_URL, {
         abhaId: session.abhaId,
         patient: session.patientDetails,
-        answers: session.answers
+        answers: session.answers,
+        prakritiData: session.prakritiData,
+        aharaData: session.aharaData,
+        redFlags: session.redFlags
     });
 
     return response.data.summary || response.data.doctorSummary;
@@ -106,9 +109,10 @@ router.post('/:sessionId/answers', async (req, res) => {
     }
 });
 
-// POST /api/sessions/:sessionId/complete - create summary and finish consultation
+// POST /api/sessions/:sessionId/complete - save Ayurvedic & Red Flags, create summary, finish session
 router.post('/:sessionId/complete', async (req, res) => {
     try {
+        const { redFlags, prakritiData, aharaData } = req.body;
         const session = await ConsultationSession.findById(req.params.sessionId);
 
         if (!session) {
@@ -126,12 +130,14 @@ router.post('/:sessionId/complete', async (req, res) => {
             });
         }
 
+        // Attach Ayurvedic and Red Flag data if provided from frontend
+        if (redFlags) session.redFlags = redFlags;
+        if (prakritiData) session.prakritiData = prakritiData;
+        if (aharaData) session.aharaData = aharaData;
+
         session.doctorSummary = await createDoctorSummary(session);
         session.status = 'completed';
         session.completedAt = new Date();
-
-        // Demo auto-delete: MongoDB removes the completed session after 5 minutes.
-        session.expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
         await session.save();
 
@@ -149,7 +155,42 @@ router.post('/:sessionId/complete', async (req, res) => {
         });
     }
 });
+// GET /api/sessions/abha/:abhaId/previous
+router.get('/abha/:abhaId/previous', async (req, res) => {
+    try {
+        const session = await ConsultationSession.findOne({
+            abhaId: req.params.abhaId,
+            status: 'completed',
+            doctorSummary: { $ne: '' }
+        }).sort({ completedAt: -1 });
 
+        if (!session) {
+            return res.status(200).json({
+                status: 'Success',
+                recordExists: false
+            });
+        }
+
+        res.status(200).json({
+            status: 'Success',
+            recordExists: true,
+            record: {
+                abhaId: session.abhaId,
+                patientDetails: session.patientDetails,
+                answers: session.answers,
+                doctorSummary: session.doctorSummary,
+                completedAt: session.completedAt
+            }
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            status: 'Error',
+            message: 'Could not fetch previous record',
+            error: error.message
+        });
+    }
+});
 // GET /api/sessions/:sessionId/summary - fetch doctor summary
 router.get('/:sessionId/summary', async (req, res) => {
     try {
